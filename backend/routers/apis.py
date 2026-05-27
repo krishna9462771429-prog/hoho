@@ -36,11 +36,16 @@ async def list_apis(user=Depends(get_current_user)):
 
 @router.post("/")
 async def create_api(data: ApiCreate, user=Depends(get_current_user)):
-    sb = get_supabase()
-    payload = data.dict()
-    payload["user_id"] = user["id"]
-    res = sb.table("apis").insert(payload).execute()
-    return res.data[0] if res.data else {}
+    try:
+        sb = get_supabase()
+        payload = data.dict()
+        payload["user_id"] = user["id"]
+        res = sb.table("apis").insert(payload).execute()
+        if res.data:
+            return res.data[0]
+        raise HTTPException(status_code=500, detail="Failed to create API")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.put("/{api_id}")

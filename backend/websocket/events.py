@@ -5,25 +5,29 @@ import asyncio
 import logging
 
 from websocket.manager import manager
-from middleware.auth import get_current_user
+from middleware.auth import get_auth_client, get_current_user
 from supabase_client import get_supabase
-import os
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
 async def verify_ws_token(token: str) -> Optional[str]:
+    """Verify WebSocket token and return user ID."""
+    if not token:
+        logger.warning("WebSocket token is empty")
+        return None
+
     try:
-        from supabase import create_client
-        SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
-        SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
-        client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+        client = get_auth_client()
         response = client.auth.get_user(token)
         if response.user:
+            logger.debug(f"WebSocket auth successful for user {response.user.id}")
             return response.user.id
+        else:
+            logger.warning("WebSocket token verification returned no user")
     except Exception as e:
-        logger.error(f"WebSocket auth failed: {e}")
+        logger.error(f"WebSocket auth failed: {e}", exc_info=True)
     return None
 
 
@@ -41,7 +45,12 @@ async def websocket_logs_endpoint(websocket: WebSocket, token: str = Query(...))
         "message": "WebSocket connection established",
         "user_id": user_id,
     }
-    await websocket.send_text(json.dumps(welcome))
+    try:
+        await websocket.send_text(json.dumps(welcome))
+    except Exception as e:
+        logger.error(f"Failed to send welcome message: {e}")
+        await manager.disconnect(websocket, user_id)
+        return
 
     try:
         while True:
@@ -78,7 +87,12 @@ async def websocket_events_endpoint(websocket: WebSocket, token: str = Query(...
         "message": "Events WebSocket connection established",
         "user_id": user_id,
     }
-    await websocket.send_text(json.dumps(welcome))
+    try:
+        await websocket.send_text(json.dumps(welcome))
+    except Exception as e:
+        logger.error(f"Failed to send welcome message: {e}")
+        await manager.disconnect(websocket, user_id)
+        return
 
     try:
         while True:

@@ -180,35 +180,26 @@ export default function DashboardHome() {
             </div>
           ) : (
             <div className="space-y-3">
-              {apis.slice(0, 6).map((api) => {
-                const live = liveApiStatus.get(api.id);
-                const status = live?.status || api.last_status;
-                const latency = live?.latency || api.last_latency_ms;
-                const hasUpdate = !!live;
-
-                return (
-                  <motion.div
-                    key={api.id}
-                    initial={hasUpdate ? { scale: 1.02 } : {}}
-                    animate={{ scale: 1 }}
-                    className={`flex items-center gap-3 p-2 rounded-lg transition-colors ${hasUpdate ? 'bg-sky-500/5' : ''}`}
-                  >
-                    <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${
-                      status === 'success' ? 'bg-emerald-400' :
-                      status === 'error' ? 'bg-red-400' :
-                      status === 'degraded' ? 'bg-amber-400' : 'bg-gray-600'
-                    } ${hasUpdate ? 'animate-pulse' : ''}`} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-300 truncate">{api.name}</p>
-                      <p className="text-xs text-gray-600 truncate">{api.url}</p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className={`text-xs font-mono ${hasUpdate ? 'text-sky-400' : 'text-gray-400'}`}>{latency}ms</p>
-                      <p className="text-xs text-gray-600">{api.uptime_percent}% up</p>
-                    </div>
-                  </motion.div>
-                );
-              })}
+              {apis.slice(0, 6).map((api) => (
+                <motion.div
+                  key={api.id}
+                  className="flex items-center gap-3 p-2 rounded-lg transition-colors"
+                >
+                  <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                    api.last_status === 'success' ? 'bg-emerald-400' :
+                    api.last_status === 'error' ? 'bg-red-400' :
+                    api.last_status === 'degraded' ? 'bg-amber-400' : 'bg-gray-600'
+                  }`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-300 truncate">{api.name}</p>
+                    <p className="text-xs text-gray-600 truncate">{api.url}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-xs font-mono text-gray-400">{api.last_latency_ms}ms</p>
+                    <p className="text-xs text-gray-600">{api.uptime_percent}% up</p>
+                  </div>
+                </motion.div>
+              ))}
             </div>
           )}
         </motion.div>

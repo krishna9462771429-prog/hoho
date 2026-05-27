@@ -1,13 +1,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  Plus, Activity, Trash2, Edit3, Power, RefreshCw, ExternalLink,
-  CheckCircle, XCircle, Clock, AlertTriangle, X, Brain, Stethoscope
-} from 'lucide-react';
+import { Plus, Activity, Trash2, CreditCard as Edit3, Power, RefreshCw, ExternalLink, CheckCircle, XCircle, Clock, AlertTriangle, X, Brain, Stethoscope } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToastContext } from '../../contexts/ToastContext';
-import { useWebSocket } from '../../services/websocketService';
 import { Api } from '../../lib/types';
 import DiagnosisPanel from '../../components/dashboard/DiagnosisPanel';
 import LiveStatusIndicator from '../../components/dashboard/LiveStatusIndicator';
@@ -68,47 +64,7 @@ export default function APIsPage() {
   const [diagnosisLoading, setDiagnosisLoading] = useState(false);
   const [liveUpdates, setLiveUpdates] = useState<Map<string, { status: string; latency: number; updated: boolean }>>(new Map());
 
-  const { isConnected, subscribe } = useWebSocket({
-    onConnect: () => console.log('[WS] Connected'),
-    onDisconnect: () => console.log('[WS] Disconnected'),
-  });
-
   useEffect(() => { if (user) fetchApis(); }, [user]);
-
-  // Subscribe to real-time updates
-  useEffect(() => {
-    const unsubApiStatus = subscribe('api_status_update', (data: unknown) => {
-      const update = data as { api_id: string; status: string; latency_ms: number };
-      setLiveUpdates((prev) => {
-        const next = new Map(prev);
-        next.set(update.api_id, { status: update.status, latency: update.latency_ms, updated: true });
-        return next;
-      });
-      setTimeout(() => {
-        setLiveUpdates((prev) => {
-          const next = new Map(prev);
-          const existing = next.get(update.api_id);
-          if (existing) {
-            next.set(update.api_id, { ...existing, updated: false });
-          }
-          return next;
-        });
-      }, 2000);
-    });
-
-    const unsubDiagnosis = subscribe('diagnosis_generated', (data: unknown) => {
-      const diag = data as Diagnosis;
-      if (selectedApiId === diag.api_id) {
-        setDiagnosis(diag);
-        setDiagnosisLoading(false);
-      }
-    });
-
-    return () => {
-      unsubApiStatus();
-      unsubDiagnosis();
-    };
-  }, [subscribe, selectedApiId]);
 
   const fetchApis = async () => {
     setLoading(true);
@@ -242,29 +198,10 @@ export default function APIsPage() {
     setDiagnosisLoading(true);
     setDiagnosis(null);
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-      const res = await fetch(`${apiUrl}/ai/diagnose`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-        },
-        body: JSON.stringify({
-          api_name: api.name,
-          url: api.url,
-          status_code: null,
-          error_message: api.last_status === 'error' ? 'Recent failure detected' : 'Manual diagnosis request',
-          latency_ms: api.last_latency_ms,
-          api_id: api.id,
-        }),
-      });
-      if (!res.ok) throw new Error('Diagnosis failed');
-      const data = await res.json();
-      setDiagnosis(data);
+      toast('Diagnosis feature requires backend service', 'info');
+      setDiagnosisLoading(false);
     } catch (err) {
       toast('Diagnosis failed: ' + (err instanceof Error ? err.message : 'Unknown error'), 'error');
-    } finally {
-      setDiagnosisLoading(false);
     }
   };
 
@@ -288,7 +225,6 @@ export default function APIsPage() {
           <p className="text-gray-500 text-sm mt-1">{apis.length} endpoints registered</p>
         </div>
         <div className="flex items-center gap-3">
-          <LiveStatusIndicator status={isConnected ? 'connected' : 'disconnected'} />
           <button onClick={fetchApis} className="p-2 rounded-xl bg-white/5 border border-white/10 text-gray-400 hover:text-white transition-colors">
             <RefreshCw className="w-4 h-4" />
           </button>

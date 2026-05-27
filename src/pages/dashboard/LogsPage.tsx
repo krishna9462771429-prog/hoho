@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Filter, RefreshCw, CheckCircle, XCircle, Brain, Clock, ChevronLeft, ChevronRight, Radio } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { useWebSocket } from '../../services/websocketService';
 import { ApiLog, Api } from '../../lib/types';
 import LiveStatusIndicator from '../../components/dashboard/LiveStatusIndicator';
 
@@ -21,25 +20,8 @@ export default function LogsPage() {
   const [total, setTotal] = useState(0);
   const logsEndRef = useRef<HTMLDivElement>(null);
 
-  const { isConnected, subscribe } = useWebSocket();
-  const [liveLogs, setLiveLogs] = useState<ApiLog[]>([]);
-  const [showLive, setShowLive] = useState(false);
-
   useEffect(() => { if (user) fetchApis(); }, [user]);
   useEffect(() => { if (user) fetchLogs(); }, [user, page, statusFilter, apiFilter]);
-
-  // Subscribe to real-time log updates
-  useEffect(() => {
-    const unsubscribe = subscribe('new_log', (data: unknown) => {
-      const newLog = data as ApiLog;
-      newLog.api_name = apis.find(a => a.id === newLog.api_id)?.name;
-      setLiveLogs(prev => [newLog, ...prev].slice(0, 100));
-      if (showLive) {
-        setLogs(prev => [newLog, ...prev].slice(0, PAGE_SIZE));
-      }
-    });
-    return () => unsubscribe();
-  }, [subscribe, apis, showLive]);
 
   const fetchApis = async () => {
     const { data } = await supabase.from('apis').select('id, name').eq('user_id', user!.id);
@@ -82,18 +64,6 @@ export default function LogsPage() {
           <p className="text-gray-500 text-sm mt-1">{total.toLocaleString()} total entries</p>
         </div>
         <div className="flex items-center gap-3">
-          <LiveStatusIndicator status={isConnected ? 'connected' : 'disconnected'} />
-          <button
-            onClick={() => setShowLive(!showLive)}
-            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all ${
-              showLive
-                ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
-                : 'bg-white/5 text-gray-400 border border-white/10 hover:text-white'
-            }`}
-          >
-            <Radio className={`w-4 h-4 ${showLive ? 'animate-pulse' : ''}`} />
-            Live
-          </button>
           <button onClick={fetchLogs} className="p-2 rounded-xl bg-white/5 border border-white/10 text-gray-400 hover:text-white transition-colors">
             <RefreshCw className="w-4 h-4" />
           </button>
@@ -130,18 +100,6 @@ export default function LogsPage() {
         </select>
       </div>
 
-      {/* Live indicator bar */}
-      {showLive && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-sky-500/10 border border-sky-500/20"
-        >
-          <div className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
-          <span className="text-sm text-sky-400 font-medium">Live streaming enabled</span>
-          <span className="text-xs text-gray-500 ml-2">{liveLogs.length} recent events</span>
-        </motion.div>
-      )}
 
       {/* Table */}
       <div className="rounded-2xl border border-white/10 bg-white/[0.03] overflow-hidden">
@@ -170,16 +128,14 @@ export default function LogsPage() {
                 </tr>
               ) : (
                 <AnimatePresence initial={false}>
-                  {filtered.map((log, i) => {
-                    const isNew = showLive && liveLogs.some(l => l.id === log.id);
-                    return (
-                      <motion.tr
-                        key={log.id}
-                        initial={isNew ? { opacity: 0, backgroundColor: 'rgba(34, 211, 238, 0.1)' } : { opacity: 1 }}
-                        animate={{ opacity: 1, backgroundColor: 'transparent' }}
-                        transition={{ duration: 0.5 }}
-                        className="border-b border-white/5 hover:bg-white/[0.02] transition-colors"
-                      >
+                  {filtered.map((log) => (
+                    <motion.tr
+                      key={log.id}
+                      initial={{ opacity: 1 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.5 }}
+                      className="border-b border-white/5 hover:bg-white/[0.02] transition-colors"
+                    >
                         <td className="px-5 py-3">
                           <div className="flex items-center gap-2">
                             {log.status === 'success' ? (
@@ -227,8 +183,7 @@ export default function LogsPage() {
                           </div>
                         </td>
                       </motion.tr>
-                    );
-                  })}
+                    ))}
                 </AnimatePresence>
               )}
             </tbody>

@@ -12,7 +12,6 @@ import StatCard from '../../components/ui/StatCard';
 import LiveStatusIndicator from '../../components/dashboard/LiveStatusIndicator';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { useWebSocket } from '../../services/websocketService';
 import { Api, ApiLog } from '../../lib/types';
 
 const EMPTY_CHART = Array.from({ length: 7 }, (_, i) => ({
@@ -27,52 +26,6 @@ export default function DashboardHome() {
   const [loading, setLoading] = useState(true);
   const [chartData, setChartData] = useState(EMPTY_CHART);
 
-  // Real-time state
-  const [liveLogs, setLiveLogs] = useState<ApiLog[]>([]);
-  const [liveApiStatus, setLiveApiStatus] = useState<Map<string, { status: string; latency: number; code: number | null }>>(new Map());
-  const [recentEvents, setRecentEvents] = useState<Array<{ type: string; data: unknown; time: Date }>>([]);
-
-  const { isConnected, subscribe } = useWebSocket();
-
-  // Subscribe to real-time events
-  useEffect(() => {
-    const unsubLog = subscribe('new_log', (data: unknown) => {
-      const log = data as ApiLog;
-      setLiveLogs(prev => [log, ...prev].slice(0, 20));
-      setRecentLogs(prev => [log, ...prev].slice(0, 10));
-      setRecentEvents(prev => [{ type: 'log', data: log, time: new Date() }, ...prev].slice(0, 5));
-    });
-
-    const unsubStatus = subscribe('api_status_update', (data: unknown) => {
-      const update = data as { api_id: string; status: string; latency_ms: number; status_code: number | null };
-      setLiveApiStatus(prev => {
-        const next = new Map(prev);
-        next.set(update.api_id, { status: update.status, latency: update.latency_ms, code: update.status_code });
-        return next;
-      });
-      setRecentEvents(prev => [{ type: 'status', data: update, time: new Date() }, ...prev].slice(0, 5));
-    });
-
-    const unsubFailure = subscribe('failure_detected', (data: unknown) => {
-      setRecentEvents(prev => [{ type: 'failure', data, time: new Date() }, ...prev].slice(0, 5));
-    });
-
-    const unsubRecovery = subscribe('recovery_detected', (data: unknown) => {
-      setRecentEvents(prev => [{ type: 'recovery', data, time: new Date() }, ...prev].slice(0, 5));
-    });
-
-    const unsubDiagnosis = subscribe('diagnosis_generated', (data: unknown) => {
-      setRecentEvents(prev => [{ type: 'diagnosis', data, time: new Date() }, ...prev].slice(0, 5));
-    });
-
-    return () => {
-      unsubLog();
-      unsubStatus();
-      unsubFailure();
-      unsubRecovery();
-      unsubDiagnosis();
-    };
-  }, [subscribe]);
 
   useEffect(() => {
     if (user) fetchData();
@@ -154,7 +107,6 @@ export default function DashboardHome() {
           <p className="text-gray-500 text-sm mt-1">Overview of your API health and performance</p>
         </div>
         <div className="flex items-center gap-3">
-          <LiveStatusIndicator status={isConnected ? 'connected' : 'disconnected'} />
           <button onClick={fetchData} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-gray-400 hover:text-white transition-colors">
             <RefreshCw className="w-4 h-4" />
             Refresh
@@ -170,30 +122,6 @@ export default function DashboardHome() {
         <StatCard title="AI Fallbacks" value={fallbacksToday} subtitle="Saved today" icon={Brain} color="amber" delay={0.15} trend={{ value: `${avgLatency}ms avg`, positive: avgLatency < 500 }} />
       </div>
 
-      {/* Real-time Event Banner */}
-      {isConnected && recentEvents.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-3 px-4 py-3 rounded-xl bg-sky-500/10 border border-sky-500/20"
-        >
-          <Radio className="w-4 h-4 text-sky-400 animate-pulse" />
-          <span className="text-sm text-sky-400">Live updates active</span>
-          <div className="flex-1 overflow-hidden">
-            <div className="flex gap-2 items-center animate-marquee">
-              {recentEvents.slice(0, 3).map((event, i) => (
-                <span key={i} className="flex items-center gap-1.5 text-xs text-gray-400 whitespace-nowrap">
-                  {eventIcon(event.type)}
-                  {event.type === 'failure' && `Failure: ${(event.data as { api_name?: string }).api_name || 'API'}`}
-                  {event.type === 'recovery' && `Recovered: ${(event.data as { api_name?: string }).api_name || 'API'}`}
-                  {event.type === 'diagnosis' && `Diagnosis generated`}
-                  {event.type === 'status' && `Status update`}
-                </span>
-              ))}
-            </div>
-          </div>
-        </motion.div>
-      )}
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

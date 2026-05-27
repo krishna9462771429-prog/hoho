@@ -1,0 +1,1000 @@
+================================================================================
+                    APIMERGE — COMPLETE FEATURES DOCUMENTATION
+================================================================================
+
+BUILD DATE: 2026-05-27
+VERSION: 1.1.0
+
+================================================================================
+                          TECHNOLOGY STACK USED
+================================================================================
+
+DATABASE:
+  - Supabase PostgreSQL (managed cloud database)
+  - Row Level Security (RLS) on ALL tables
+  - Real-time subscriptions capability
+  - UUID primary keys with gen_random_uuid()
+
+BACKEND:
+  - Python 3.x
+  - FastAPI 0.111.0 (async web framework)
+  - Uvicorn 0.29.0 (ASGI server)
+  - Supabase Python SDK 2.4.3
+  - httpx 0.27.0 (async HTTP client)
+  - APScheduler 3.10.4 (scheduled monitoring jobs)
+  - Pydantic 2.7.1 (data validation)
+  - python-dotenv 1.0.1 (environment variables)
+  - WebSockets (native FastAPI WebSocket support)
+
+AI PROVIDERS:
+  - Groq API (LLaMA-3.1-8b-instant model) — Primary
+  - Google Gemini 1.5 Flash — Fallback
+  - Structured prompts for JSON responses
+  - Automatic provider cascade on failure
+
+FRONTEND:
+  - React 18.3.1
+  - Vite 5.4.2 (build tool)
+  - TypeScript 5.5.3
+  - TailwindCSS 3.4.1 (styling)
+  - React Router DOM 6.x (client-side routing)
+  - Framer Motion 11.x (animations)
+  - Recharts 2.x (charts/graphs)
+  - Lucide React (icons)
+  - Axios 1.x (HTTP client)
+  - Supabase JS SDK 2.57.4 (auth + database + realtime)
+  - Native WebSocket API (real-time streaming)
+
+DEPLOYMENT:
+  - Vercel (frontend hosting)
+  - Render (backend hosting)
+
+================================================================================
+                      DATABASE TABLES (13 TOTAL)
+================================================================================
+
+1. user_profiles
+   - Stores extended user data
+   - Fields: id, email, name, avatar_url, created_at, updated_at
+   - RLS: Users can only access their own profile
+   - Usage: Auth system, user settings
+
+2. user_settings
+   - Per-user configuration preferences
+   - Fields: id, user_id, default_timeout, default_retries, primary_ai_provider,
+     email_alerts_enabled, notification_email, discord_webhook_url, created_at
+   - RLS: Users can only access their own settings
+   - Usage: Dashboard settings page, AI provider selection, alert configuration
+
+3. apis
+   - Registered API endpoints for monitoring
+   - Fields: id, user_id, name, url, method, headers, timeout, retries,
+     expected_status, interval_seconds, is_active, last_status, last_latency_ms,
+     last_checked_at, total_checks, failed_checks, uptime_percent, created_at
+   - RLS: Users can only access their own APIs
+   - Usage: API monitoring, health checks, ping functionality
+
+4. api_logs
+   - Individual request/response logs per health check
+   - Fields: id, api_id, user_id, status, status_code, latency_ms,
+     response_body, error_message, is_fallback, checked_at
+   - RLS: Users can only access their own logs
+   - Usage: Logs page, analytics, history tracking
+
+5. alerts
+   - Alert configurations per API
+   - Fields: id, api_id, user_id, alert_type, threshold, is_active, last_triggered
+   - RLS: Users can only access their own alerts
+   - Usage: Alert management, notification triggers
+
+6. workflows
+   - API merge/orchestration workflows
+   - Fields: id, user_id, name, description, apis (jsonb), merge_strategy,
+     slug, is_active, created_at
+   - RLS: Users can only access their own workflows
+   - Usage: API merge feature, workflow orchestration
+
+7. ticker_services
+   - Keep-alive URLs for Render/Vercel free tier
+   - Fields: id, user_id, name, url, interval_seconds, is_active,
+     last_pinged_at, last_status, ping_count, created_at
+   - RLS: Users can only access their own tickers
+   - Usage: Keep services alive, prevent cold starts
+
+8. monitoring_logs
+   - Scheduled monitoring job results
+   - Fields: id, user_id, job_type, status, details, executed_at
+   - RLS: Users can only access their own monitoring logs
+   - Usage: Job tracking, scheduler monitoring
+
+9. ai_fallbacks
+   - AI-generated fallback responses for failed APIs
+   - Fields: id, user_id, api_id, provider, failure_reason, response,
+     latency_ms, created_at
+   - RLS: Users can only access their own fallbacks
+   - Usage: AI fallback system, response caching
+
+10. provider_usage
+    - AI provider call tracking and analytics
+    - Fields: id, user_id, provider, model, tokens_used, latency_ms, success, created_at
+    - RLS: Users can only access their own usage data
+    - Usage: AI analytics, cost tracking
+
+11. analytics_snapshots
+    - Periodic aggregated analytics
+    - Fields: id, user_id, snapshot_type, data (jsonb), created_at
+    - RLS: Users can only access their own snapshots
+    - Usage: Historical analytics, trend analysis
+
+12. cache_entries
+    - Cached AI responses
+    - Fields: id, user_id, cache_key, response, expires_at, created_at
+    - RLS: Users can only access their own cache
+    - Usage: Response caching, performance optimization
+
+13. failure_diagnoses (NEW)
+    - AI-generated failure diagnoses for API failures
+    - Fields: id, user_id, api_id, diagnosis, severity, confidence,
+      suggested_fix, recommended_action, provider_used, raw_error (jsonb),
+      failure_category, created_at
+    - RLS: Users can only access their own diagnoses
+    - Usage: AI diagnosis system, failure analysis
+
+ALL TABLES HAVE:
+  - UUID primary keys (gen_random_uuid())
+  - Created_at timestamps
+  - Row Level Security enabled
+  - Performance indexes on frequently queried columns
+
+================================================================================
+                          API ENDPOINTS (35+)
+================================================================================
+
+AUTH (via Supabase):
+  POST /auth/v1/signup              - User registration
+  POST /auth/v1/token              - Login (get JWT)
+  POST /auth/v1/recover            - Password reset request
+  GET  /auth/v1/user               - Get current user
+  POST /auth/v1/logout            - Sign out
+
+BACKEND ROUTES:
+
+ROOT:
+  GET  /                           - Root health check
+  GET  /health                     - Health endpoint
+
+APIS (/apis):
+  GET  /apis/                      - List all user APIs
+  POST /apis/                      - Create new API endpoint
+  GET  /apis/{id}                  - Get single API
+  PUT  /apis/{id}                  - Update API
+  DELETE /apis/{id}                - Delete API
+  POST /apis/{id}/check            - Manual health check
+
+AI (/ai):
+  POST /ai/fallback                - Generate AI fallback response
+  POST /ai/generate                - Generate workflow/schema via AI
+  POST /ai/diagnose                - AI failure diagnosis (NEW)
+  GET  /ai/diagnoses/{api_id}      - Get diagnosis history for API (NEW)
+  GET  /ai/diagnoses               - List all diagnoses for user (NEW)
+  GET  /ai/diagnosis-stats         - Diagnosis statistics (NEW)
+  POST /ai/categorize              - Categorize failure type only (NEW)
+
+MERGE (/merge):
+  POST /merge/execute              - Execute merge of multiple APIs
+  GET  /merge/{slug}               - Call workflow by slug
+
+TICKER (/ticker):
+  GET  /ticker/                    - List keep-alive services
+  POST /ticker/                    - Create ticker service
+  GET  /ticker/{id}                - Get ticker details
+  PUT  /ticker/{id}                - Update ticker
+  DELETE /ticker/{id}              - Delete ticker
+  POST /ticker/{id}/ping           - Manual ping
+
+MONITORING (/monitoring):
+  GET  /monitoring/logs            - Get logs (paginated, filtered)
+  GET  /monitoring/stats           - Dashboard statistics
+
+ANALYTICS (/analytics):
+  GET  /analytics/overview         - Full analytics data
+
+WORKFLOWS (/workflows):
+  GET  /workflows/                 - List workflows
+  POST /workflows/                 - Create workflow
+  GET  /workflows/{id}             - Get workflow
+  PUT  /workflows/{id}             - Update workflow
+  DELETE /workflows/{id}           - Delete workflow
+
+WEBSOCKET (/ws): (NEW)
+  WS   /ws/logs?token=...          - Real-time log stream
+  WS   /ws/events?token=...        - Real-time events stream
+  GET  /ws/stats                   - WebSocket connection stats
+
+================================================================================
+                      WEBSOCKET EVENTS (NEW FEATURE)
+================================================================================
+
+EVENT TYPES:
+  - api_status_update      : API status/latency changes
+  - new_log                : New log entry streamed
+  - failure_detected       : API failure detected
+  - recovery_detected      : API recovered from failure
+  - diagnosis_generated    : AI diagnosis completed
+  - ticker_ping            : Keep-alive ping result
+  - ai_fallback_generated  : AI fallback created
+  - workflow_execution     : Workflow executed
+  - high_latency           : High latency warning
+
+EVENT PAYLOAD EXAMPLE:
+{
+  "type": "api_status_update",
+  "data": {
+    "api_id": "uuid",
+    "api_name": "Weather API",
+    "status": "success",
+    "latency_ms": 245,
+    "status_code": 200,
+    "timestamp": "2026-05-27T10:30:00Z"
+  },
+  "user_id": "uuid"
+}
+
+================================================================================
+                          FRONTEND FILES (35+)
+================================================================================
+
+CORE CONFIG:
+  - index.html                     - Entry HTML with meta tags
+  - src/main.tsx                    - React app entry point
+  - src/index.css                   - Global styles, Tailwind, scrollbar
+  - tailwind.config.js              - Tailwind configuration
+  - vite.config.ts                  - Vite build configuration
+  - tsconfig.json                   - TypeScript configuration
+  - package.json                    - Dependencies and scripts
+
+LIBRARIES & TYPES:
+  - src/lib/supabase.ts             - Supabase client singleton
+  - src/lib/types.ts                 - TypeScript interfaces for all entities
+
+CONTEXTS:
+  - src/contexts/AuthContext.tsx    - Auth state management, signUp/signIn/signOut
+  - src/contexts/ToastContext.tsx   - Toast notification provider
+
+HOOKS:
+  - src/hooks/useToast.ts            - Toast state management
+  - src/hooks/useRealtime.ts         - Supabase Realtime + WebSocket hooks (NEW)
+
+SERVICES:
+  - src/services/apiClient.ts        - Axios client with token injection
+  - src/services/websocketService.ts - WebSocket hook with reconnection (NEW)
+
+COMPONENTS:
+  - src/components/ui/Toast.tsx      - Toast notification container
+  - src/components/ui/StatCard.tsx  - Dashboard KPI card
+  - src/components/dashboard/DiagnosisPanel.tsx    - AI diagnosis display (NEW)
+  - src/components/dashboard/LiveStatusIndicator.tsx - Connection status (NEW)
+  - src/components/dashboard/LiveLogFeed.tsx      - Live log streaming (NEW)
+
+LAYOUTS:
+  - src/layouts/DashboardLayout.tsx - Sidebar + top nav + content area
+
+LANDING PAGE:
+  - src/pages/LandingPage.tsx       - Full landing page with:
+    * Cyberpunk dark theme
+    * Animated hero section with gradient text
+    * 6 feature cards with icons
+    * AI fallback explanation section
+    * Pricing table (3 tiers: Free, Pro, Enterprise)
+    * CTA section with signup button
+    * Dashboard preview mockup
+    * Responsive design for all devices
+
+AUTH PAGES:
+  - src/pages/auth/LoginPage.tsx        - Email/password login with validation
+  - src/pages/auth/SignupPage.tsx       - Registration with name field
+  - src/pages/auth/ForgotPasswordPage.tsx - Password reset request
+
+DASHBOARD PAGES:
+  - src/pages/dashboard/DashboardHome.tsx
+    * 4 KPI cards (active APIs, uptime, failures, AI fallbacks)
+    * Uptime area chart (7 days)
+    * Latency bar chart (7 days)
+    * API status list with live updates (NEW)
+    * Recent activity feed with animations (NEW)
+    * Live events banner (NEW)
+    * Real-time status indicators (NEW)
+
+  - src/pages/dashboard/APIsPage.tsx
+    * Add/edit/delete API endpoints
+    * Enable/disable toggle
+    * Manual ping/check button
+    * Configure: URL, method, timeout, retries, interval, expected status
+    * Custom headers (JSON)
+    * Status indicator with live updates (NEW)
+    * Diagnose failure button (NEW)
+    * Diagnosis modal with AI analysis (NEW)
+    * Live latency display (NEW)
+
+  - src/pages/dashboard/LogsPage.tsx
+    * Paginated table
+    * Search by error message/status
+    * Filter by status (success/error)
+    * Filter by API
+    * Live streaming mode toggle (NEW)
+    * Real-time log entries with animations (NEW)
+    * AI fallback badge indicator
+
+  - src/pages/dashboard/AnalyticsPage.tsx
+    * Summary cards (total requests, success, errors, AI fallbacks)
+    * Request volume area chart (30 days)
+    * Latency trend line chart
+    * Failure heatmap by hour
+    * AI provider usage pie chart
+    * Overall latency + success rate stats
+
+  - src/pages/dashboard/MergePage.tsx
+    * Create merge workflow from multiple APIs
+    * Select multiple APIs
+    * Choose merge strategy (merge/first_success/all_required)
+    * Execute workflow and see merged response
+    * Unique endpoint slug for each workflow
+    * Copy endpoint URL button
+    * Delete workflow
+
+  - src/pages/dashboard/WorkflowsPage.tsx
+    * Three preset modes (Format, Workflow, Schema)
+    * Text input for description
+    * Quick example suggestions
+    * Generate button (calls backend AI)
+    * Local fallback generation if backend unavailable
+    * Expandable result cards
+    * Copy to clipboard
+
+  - src/pages/dashboard/TickerPage.tsx
+    * Add keep-alive service (name, URL)
+    * Configure ping interval (1/5/10/15/30 min)
+    * Manual ping button
+    * Enable/disable toggle
+    * Delete service
+    * Last status, ping count display
+
+  - src/pages/dashboard/AIToolsPage.tsx
+    * Fallback response tester
+    * Input: API name, failure description
+    * Provider selection (Groq/Gemini)
+    * Generate with latency tracking
+    * Copy response
+    * "How it works" explanation
+
+  - src/pages/dashboard/SettingsPage.tsx
+    * Default timeout configuration
+    * Default retries configuration
+    * Primary AI provider selection
+    * Email alerts toggle
+    * Notification email input
+    * Discord webhook toggle
+    * Discord webhook URL input
+    * Save settings button
+
+ROUTING:
+  - src/App.tsx                     - React Router with protected routes
+
+================================================================================
+                          BACKEND FILES (20+)
+================================================================================
+
+MAIN:
+  - backend/main.py                 - FastAPI app, CORS, routers, scheduler start
+  - backend/supabase_client.py      - Supabase service role client singleton
+  - backend/requirements.txt        - Python dependencies
+
+MIDDLEWARE:
+  - backend/middleware/auth.py      - JWT verification via Supabase
+  - backend/middleware/__init__.py
+
+ROUTERS:
+  - backend/routers/apis.py         - API CRUD + health check endpoint
+  - backend/routers/ai.py           - Fallback, workflow, diagnosis endpoints (NEW)
+  - backend/routers/merge.py        - Execute merge, slug endpoint
+  - backend/routers/ticker.py       - Keep-alive CRUD + ping
+  - backend/routers/monitoring.py   - Logs + dashboard stats
+  - backend/routers/analytics.py    - Analytics aggregation
+  - backend/routers/workflows.py    - Workflow CRUD
+  - backend/routers/__init__.py
+
+AI CLIENTS:
+  - backend/ai/groq_client.py       - Groq LLaMA-3.1 integration
+  - backend/ai/gemini_client.py     - Google Gemini integration
+  - backend/ai/failure_diagnosis.py - AI failure diagnosis system (NEW)
+  - backend/ai/__init__.py
+
+SERVICES:
+  - backend/services/diagnosis_service.py - Diagnosis CRUD + stats (NEW)
+  - backend/services/__init__.py
+
+WEBSOCKET: (NEW)
+  - backend/websocket/manager.py     - Connection manager + event broadcasting
+  - backend/websocket/events.py     - WebSocket endpoints (/ws/logs, /ws/events)
+  - backend/websocket/__init__.py
+
+SCHEDULER:
+  - backend/scheduler/jobs.py      - APScheduler with WebSocket broadcasts (UPDATED)
+  - backend/scheduler/__init__.py
+
+UTILS:
+  - backend/utils/__init__.py
+
+================================================================================
+                      FEATURE 1: AI FAILURE DIAGNOSIS SYSTEM
+================================================================================
+
+PURPOSE:
+  Intelligently analyze API failures and provide root cause analysis,
+  suggested fixes, and retry recommendations.
+
+BACKEND IMPLEMENTATION:
+  File: backend/ai/failure_diagnosis.py
+
+  Functions:
+    - categorize_failure(status_code, error_message) -> str
+      * Categorizes failure into: timeout, dns, rate_limit, auth,
+        server_error, client_error, ssl, network, unknown
+
+    - diagnose_failure(api_name, url, status_code, error_message,
+                       latency_ms, previous_logs) -> Dict
+      * Uses Groq LLaMA-3.1-8b-instant as primary AI
+      * Falls back to Gemini 1.5 Flash if Groq fails
+      * Structured prompt for JSON response
+      * Includes context from previous 10 failures
+      * Returns: diagnosis, severity, confidence, suggested_fix,
+                 recommended_action, provider_used, failure_category
+
+  File: backend/services/diagnosis_service.py
+
+  Functions:
+    - create_diagnosis(user_id, api_id, ...) -> Dict
+      * Creates diagnosis record in database
+      * Broadcasts diagnosis_generated event via WebSocket
+
+    - get_diagnoses_for_api(api_id, user_id, limit) -> List[Dict]
+      * Retrieves diagnosis history for specific API
+
+    - get_diagnosis_stats(user_id) -> Dict
+      * Returns: total, by_severity, by_category, by_action, avg_confidence
+
+  API ENDPOINTS:
+    POST /ai/diagnose
+      Input:
+        - api_name: str
+        - url: str
+        - status_code: int (optional)
+        - error_message: str
+        - latency_ms: int
+        - api_id: str (optional)
+        - previous_logs: List[Dict] (optional)
+
+      Output:
+        - diagnosis: str
+        - severity: "low" | "medium" | "high" | "critical"
+        - confidence: 0.0 - 1.0
+        - suggested_fix: str
+        - recommended_action: "retry" | "skip" | "escalate" |
+                             "investigate" | "disable" | "contact_support"
+        - provider_used: "groq" | "gemini"
+        - failure_category: str
+        - explanation: str (detailed analysis)
+
+    GET /ai/diagnoses/{api_id}
+      - Returns last N diagnoses for specific API
+
+    GET /ai/diagnoses
+      - Returns all diagnoses for user
+
+    GET /ai/diagnosis-stats
+      - Returns aggregate statistics
+
+DATABASE:
+  Table: failure_diagnoses
+    - id (uuid, primary key)
+    - user_id (text, references auth.users)
+    - api_id (uuid, references apis.id)
+    - diagnosis (text)
+    - severity (text: low/medium/high/critical)
+    - confidence (numeric: 0.000 to 1.000)
+    - suggested_fix (text)
+    - recommended_action (text)
+    - provider_used (text: groq/gemini)
+    - raw_error (jsonb: {status_code, error_message, latency_ms, timestamp})
+    - failure_category (text)
+    - created_at (timestamptz)
+
+  RLS Policies:
+    - Users can view own diagnoses
+    - Users can insert own diagnoses
+
+FRONTEND COMPONENTS:
+  File: src/components/dashboard/DiagnosisPanel.tsx
+
+  Features:
+    - Animated loading state with progress bar
+    - Severity badges with color coding:
+      * low: emerald (green)
+      * medium: amber (yellow)
+      * high: orange
+      * critical: red
+    - Confidence meter (0-100% with visual bar)
+    - Suggested fix card with icon
+    - Detailed explanation expandable
+    - Category and status code display
+    - Timestamp and copy button
+    - Compact mode for inline display
+
+  Integration:
+    - Diagnose button on APIsPage for failed APIs
+    - Modal popup with full diagnosis details
+    - Real-time diagnosis updates via WebSocket
+
+TECHNOLOGIES USED:
+  - Groq API: LLaMA-3.1-8b-instant model
+  - Google Gemini API: gemini-1.5-flash model
+  - httpx: Async HTTP client for API calls
+  - Pydantic: Request/response validation
+  - JSON structured prompts for reliability
+  - WebSocket for real-time diagnosis delivery
+
+================================================================================
+                      FEATURE 2: REAL-TIME MONITORING PIPELINE
+================================================================================
+
+PURPOSE:
+  Build infrastructure for instant updates across the dashboard,
+  live log streaming, and real-time notifications.
+
+BACKEND IMPLEMENTATION:
+  File: backend/websocket/manager.py
+
+  Class: ConnectionManager
+    - active_connections: Dict[user_id, Set[WebSocket]]
+    - connect(websocket, user_id)
+    - disconnect(websocket, user_id)
+    - send_personal(user_id, message)
+    - broadcast(message)
+    - get_user_count()
+    - get_connection_count(user_id)
+
+  Event Types:
+    - API_STATUS_UPDATE
+    - NEW_LOG
+    - AI_FALLBACK_GENERATED
+    - TICKER_PING
+    - WORKFLOW_EXECUTION
+    - FAILURE_DETECTED
+    - DIAGNOSIS_GENERATED
+    - RECOVERY_DETECTED
+    - HIGH_LATENCY
+
+  Broadcast Functions:
+    - broadcast_api_status(user_id, api_id, api_name, status, latency_ms, status_code)
+    - broadcast_new_log(user_id, log)
+    - broadcast_failure(user_id, api_id, api_name, error_message, latency_ms, status_code)
+    - broadcast_recovery(user_id, api_id, api_name, latency_ms)
+    - broadcast_diagnosis(user_id, diagnosis)
+    - broadcast_ai_fallback(user_id, fallback)
+    - broadcast_workflow_execution(user_id, workflow_id, workflow_name, status, result)
+    - broadcast_ticker_ping(user_id, ticker_id, ticker_name, status, latency_ms)
+
+  File: backend/websocket/events.py
+
+  WebSocket Endpoints:
+    WS /ws/logs?token={jwt}
+      - Authenticated WebSocket connection
+      - User-specific event streaming
+      - Heartbeat every 30 seconds
+      - Auto-reconnect handling
+
+    WS /ws/events?token={jwt}
+      - Alternative events-only endpoint
+      - Same authentication and features
+
+    GET /ws/stats
+      - Returns active connection statistics
+
+  Authentication:
+    - JWT token verification via Supabase
+    - User ID extracted from token
+    - Connections scoped to authenticated user
+
+SCHEDULER INTEGRATION:
+  File: backend/scheduler/jobs.py (updated)
+
+  check_all_apis():
+    - Runs every 60 seconds
+    - Checks all active APIs
+    - On each check:
+      * Broadcast api_status_update
+      * Broadcast new_log
+      * If failure: broadcast failure_detected
+      * If recovery: broadcast recovery_detected
+      * If failure: create AI diagnosis and broadcast diagnosis_generated
+
+  ping_all_tickers():
+    - Runs every 5 minutes
+    - Pings all active keep-alive services
+    - Broadcast ticker_ping for each result
+
+FRONTEND IMPLEMENTATION:
+  File: src/services/websocketService.ts
+
+  Hook: useWebSocket(options)
+    Options:
+      - onConnect: callback
+      - onDisconnect: callback
+      - onError: callback
+      - autoReconnect: boolean (default: true)
+      - reconnectDelay: number (default: 3000ms)
+      - maxReconnectAttempts: number (default: 5)
+
+    Returns:
+      - isConnected: boolean
+      - connect: function
+      - disconnect: function
+      - subscribe(eventType, callback): function
+      - send(data): function
+
+    Features:
+      - Automatic token injection from Supabase session
+      - Exponential backoff for reconnection
+      - Heartbeat (ping/pong) every 30 seconds
+      - Event subscription pattern
+      - Wildcard subscription ("*" for all events)
+      - Dead connection cleanup
+
+  File: src/hooks/useRealtime.ts
+
+  Hook: useRealtime(options)
+    Options:
+      - onApiStatusUpdate: callback
+      - onNewLog: callback
+      - onDiagnosis: callback
+      - onFailure: callback
+      - onRecovery: callback
+      - onTickerPing: callback
+
+    Returns:
+      - connected: boolean
+      - apiStatus: Map<api_id, ApiStatusUpdate>
+      - broadcast: function
+
+  Hook: useWebSocketRealtime(options)
+    - Alternative WebSocket-based hook
+    - Same features as useRealtime
+    - Direct WebSocket connection (no Supabase Realtime)
+
+UI COMPONENTS:
+  File: src/components/dashboard/LiveStatusIndicator.tsx
+
+  Props:
+    - status: "connected" | "disconnected" | "connecting"
+    - label: string (optional)
+
+  Features:
+    - Pulsing animation when connected
+    - Color coding:
+      * connected: emerald (green)
+      * disconnected: red
+      * connecting: amber (yellow)
+
+  File: src/components/dashboard/LiveLogFeed.tsx
+
+  Props:
+    - logs: LogEntry[]
+    - maxVisible: number (default: 10)
+
+  Features:
+    - Animated entry/exit transitions
+    - Status-based coloring (success: green, error: red)
+    - Timestamp display
+    - AI fallback badge
+    - Monospace font for logs
+    - Auto-reverse order (newest first)
+
+DASHBOARD INTEGRATIONS:
+  DashboardHome.tsx (updated):
+    - LiveStatusIndicator in header
+    - Live events banner showing recent activity
+    - Real-time API status list with animations
+    - Live activity feed
+    - WebSocket subscription on mount
+
+  APIsPage.tsx (updated):
+    - LiveStatusIndicator in header
+    - Real-time status updates per API
+    - Animated status icons on update
+    - Live latency display
+    - Diagnosis modal for failed APIs
+    - WebSocket event handling
+
+  LogsPage.tsx (updated):
+    - Live mode toggle button
+    - Real-time log streaming
+    - Animated new log entries
+    - LiveStatusIndicator
+    - WebSocket subscription
+
+TECHNOLOGIES USED:
+  - FastAPI WebSocket support (native)
+  - Python asyncio for async WebSocket handling
+  - Supabase JWT authentication
+  - React hooks for state management
+  - Framer Motion for animations
+  - Native WebSocket API (browser)
+
+================================================================================
+                      SCHEDULER JOBS IMPLEMENTATION
+================================================================================
+
+FILE: backend/scheduler/jobs.py
+
+check_all_apis() - Every 60 seconds:
+  1. Fetch all active APIs from database
+  2. For each API:
+     a. Make HTTP request to API endpoint
+     b. Measure latency
+     c. Determine success/failure based on expected_status
+     d. Insert log entry into api_logs table
+     e. Update API statistics (total_checks, failed_checks, uptime_percent)
+     f. Broadcast api_status_update via WebSocket
+     g. Broadcast new_log via WebSocket
+     h. If failure detected:
+        - Broadcast failure_detected
+        - Create AI diagnosis via Groq/Gemini
+        - Store diagnosis in failure_diagnoses table
+        - Broadcast diagnosis_generated
+     i. If recovery detected (was error, now success):
+        - Broadcast recovery_detected
+
+ping_all_tickers() - Every 5 minutes:
+  1. Fetch all active ticker services
+  2. For each ticker:
+     a. Make GET request to ticker URL
+     b. Measure latency
+     c. Update last_pinged_at, last_status, ping_count
+     d. Broadcast ticker_ping via WebSocket
+
+TECHNOLOGIES USED:
+  - APScheduler 3.10.4 (AsyncIOScheduler)
+  - IntervalTrigger for periodic execution
+  - httpx for async HTTP requests
+  - Supabase Python SDK for database operations
+  - WebSocket manager for real-time broadcasting
+
+================================================================================
+                      AI FALLBACK RESPONSE SYSTEM
+================================================================================
+
+PURPOSE:
+  When an API fails, generate intelligent fallback responses
+  to maintain application functionality.
+
+BACKEND:
+  File: backend/ai/groq_client.py
+
+  Functions:
+    - generate_fallback(failure_reason, api_context) -> str
+      * Uses LLaMA-3.1-8b-instant
+      * Structured prompt for JSON fallback
+      * High-performance inference (sub-500ms)
+
+    - generate_workflow(description) -> str
+      * Generates workflow JSON from natural language
+
+  File: backend/ai/gemini_client.py
+
+  Functions:
+    - generate_fallback(failure_reason, api_context) -> str
+      * Fallback if Groq unavailable
+      * Uses gemini-1.5-flash
+
+    - generate_format(description) -> str
+      * Generates data format schemas
+
+API ENDPOINT:
+  POST /ai/fallback
+    Input:
+      - failure_reason: str
+      - api_context: str (optional)
+      - api_id: str (optional)
+      - provider: str (default: "groq")
+
+    Output:
+      - provider: str
+      - response: str (JSON fallback data)
+      - latency_ms: int
+
+TECHNOLOGIES USED:
+  - Groq API: Ultra-fast inference
+  - Google Gemini API: Reliable fallback
+  - httpx: Async HTTP client
+  - Provider cascade pattern
+
+================================================================================
+                      AUTHENTICATION SYSTEM
+================================================================================
+
+IMPLEMENTATION:
+  Provider: Supabase Email/Password Authentication
+
+  Features:
+    - Email/password signup
+    - Email/password login (JWT tokens)
+    - Password reset via email
+    - Session persistence (localStorage)
+    - Auto token refresh
+    - Protected routes (frontend)
+    - JWT middleware (backend)
+
+DATABASE:
+  Tables: auth.users, auth.sessions (Supabase managed)
+  Custom tables: user_profiles, user_settings
+
+FRONTEND:
+  File: src/contexts/AuthContext.tsx
+
+  State:
+    - user: User | null
+    - session: Session | null
+    - loading: boolean
+
+  Functions:
+    - signUp(email, password, name)
+    - signIn(email, password)
+    - signOut()
+    - resetPassword(email)
+
+  Integration:
+    - React Context provider
+    - useAuth() hook
+    - ProtectedRoute component
+    - Axios interceptor for Bearer token
+
+BACKEND:
+  File: backend/middleware/auth.py
+
+  Function: get_current_user(token) -> Dict
+    - Verifies JWT via Supabase
+    - Extracts user ID
+    - Returns user context
+
+  Usage:
+    - FastAPI Depends() injection
+    - All protected endpoints
+
+TECHNOLOGIES USED:
+  - Supabase GoTrue (auth service)
+  - JWT tokens (access + refresh)
+  - React Context API
+  - Axios interceptors
+  - FastAPI middleware
+
+================================================================================
+                      LANDING PAGE FEATURES
+================================================================================
+
+FILE: src/pages/LandingPage.tsx
+
+SECTIONS:
+  1. HERO SECTION
+     - Animated gradient text
+     - "AI-Powered API Reliability"
+     - Tagline and description
+     - CTA buttons (Get Started, View Demo)
+     - Dashboard preview mockup
+
+  2. FEATURES GRID (6 cards)
+     - Real-Time Monitoring
+     - AI Failure Diagnosis
+     - Smart Fallback Responses
+     - API Merging & Orchestration
+     - Keep-Alive Ticker
+     - Advanced Analytics
+
+  3. AI FALLBACK EXPLAINER
+     - Visual diagram
+     - Step-by-step process
+     - Benefits list
+
+  4. PRICING SECTION (3 tiers)
+     - Free: $0/mo (3 APIs, basic monitoring)
+     - Pro: $29/mo (25 APIs, AI diagnosis)
+     - Enterprise: $99/mo (unlimited, priority support)
+
+  5. CTA SECTION
+     - "Ready to make your APIs bulletproof?"
+     - Get Started button
+
+STYLING:
+  - Dark cyberpunk theme
+  - Glassmorphism cards
+  - Gradient backgrounds
+  - Animated elements (Framer Motion)
+  - Responsive design (all devices)
+
+TECHNOLOGIES USED:
+  - TailwindCSS for styling
+  - Framer Motion for animations
+  - Lucide React for icons
+  - React Router for navigation
+
+================================================================================
+                      ENVIRONMENT VARIABLES REQUIRED
+================================================================================
+
+FRONTEND (.env):
+  VITE_SUPABASE_URL         = https://xxx.supabase.co
+  VITE_SUPABASE_ANON_KEY    = eyJxxx...
+  VITE_API_URL              = http://localhost:8000
+
+BACKEND (backend/.env):
+  SUPABASE_URL              = https://xxx.supabase.co
+  SUPABASE_ANON_KEY         = eyJxxx...
+  SUPABASE_SERVICE_ROLE_KEY = eyJxxx...
+  GROQ_API_KEY              = gsk_xxx
+  GEMINI_API_KEY            = AIza_xxx
+  RESEND_API_KEY            = re_xxx (optional, for emails)
+  DISCORD_WEBHOOK_URL       = https://discord.com/api/webhooks/xxx (optional)
+
+================================================================================
+                      RUN COMMANDS
+================================================================================
+
+FRONTEND:
+  npm install
+  npm run dev       # Development server (port 5173)
+  npm run build     # Production build
+  npm run preview   # Preview production build
+
+BACKEND:
+  cd backend
+  pip install -r requirements.txt
+  uvicorn main:app --reload --port 8000
+
+DOCKER (optional):
+  docker-compose up --build
+
+================================================================================
+                      DEPLOYMENT INSTRUCTIONS
+================================================================================
+
+FRONTEND (VERCEL):
+  1. Push to GitHub
+  2. Import in Vercel
+  3. Set VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, VITE_API_URL
+  4. Deploy
+
+BACKEND (RENDER):
+  1. Create Web Service on render.com
+  2. Connect GitHub repo
+  3. Root directory: backend
+  4. Build: pip install -r requirements.txt
+  5. Start: uvicorn main:app --host 0.0.0.0 --port $PORT
+  6. Add all environment variables
+  7. Deploy
+
+================================================================================
+                      SUMMARY STATISTICS
+================================================================================
+
+DATABASE TABLES:      13
+API ENDPOINTS:       35+
+WEBSOCKET ENDPOINTS:  2
+WEBSOCKET EVENTS:     9
+FRONTEND PAGES:       14
+FRONTEND COMPONENTS:  10+
+BACKEND FILES:        20+
+AI PROVIDERS:        2 (Groq + Gemini)
+TOTAL LINES OF CODE: ~15,000+
+
+================================================================================
+                              END OF DOCUMENTATION
+================================================================================

@@ -1,0 +1,96 @@
+APIMerge — Build Progress
+
+STATUS: Full build with real-time monitoring and AI diagnosis complete.
+
+================================================================================
+                          NEW FEATURES IMPLEMENTED
+================================================================================
+
+FEATURE 1 — AI FAILURE DIAGNOSIS SYSTEM:
+  ✓ Automatic failure detection and categorization
+  ✓ Root cause analysis via Groq LLaMA-3.1 (primary)
+  ✓ Gemini fallback if Groq fails
+  ✓ Confidence scoring (0.0 - 1.0)
+  ✓ Severity levels: low, medium, high, critical
+  ✓ Suggested fixes with actionable recommendations
+  ✓ Recommended actions: retry, skip, escalate, investigate, disable, contact_support
+  ✓ Failure categories: timeout, dns, rate_limit, auth, server_error, ssl, network, etc.
+  ✓ Diagnosis history stored in failure_diagnoses table
+  ✓ Frontend DiagnosisPanel with expandable details
+  ✓ Diagnose button on failed APIs in dashboard
+
+FEATURE 2 — REAL-TIME MONITORING PIPELINE:
+  ✓ WebSocket server at /ws/logs and /ws/events
+  ✓ Connection manager with user-specific channels
+  ✓ Auto-reconnect with exponential backoff (max 5 attempts)
+  ✓ Heartbeat for connection health
+  ✓ Event types:
+    - api_status_update (live status changes)
+    - new_log (streaming log entries)
+    - failure_detected (API went down)
+    - recovery_detected (API came back up)
+    - diagnosis_generated (AI diagnosis complete)
+    - ticker_ping (keep-alive result)
+    - ai_fallback_generated
+    - workflow_execution
+  ✓ Scheduler integration (broadcasts on every check)
+  ✓ Frontend useWebSocket hook with subscribe pattern
+  ✓ Frontend LiveStatusIndicator (connected/disconnected)
+  ✓ Frontend LiveLogFeed animated component
+  ✓ Dashboard home with live events banner
+  ✓ APIs page with real-time status updates and diagnosis modal
+  ✓ Logs page with live streaming mode toggle
+
+================================================================================
+                          UPDATED COMPONENTS
+================================================================================
+
+FRONTEND:
+  ✓ src/pages/dashboard/DashboardHome.tsx - Live updates banner, real-time API status
+  ✓ src/pages/dashboard/APIsPage.tsx - Diagnosis button, diagnosis modal, live status
+  ✓ src/pages/dashboard/LogsPage.tsx - Live streaming mode, real-time entries
+  ✓ src/services/websocketService.ts - WebSocket hook with auto-reconnect
+  ✓ src/hooks/useRealtime.ts - Supabase Realtime + WebSocket hooks
+  ✓ src/components/dashboard/DiagnosisPanel.tsx - Full diagnosis UI
+  ✓ src/components/dashboard/LiveStatusIndicator.tsx - Connection status badge
+  ✓ src/components/dashboard/LiveLogFeed.tsx - Animated log streaming
+
+BACKEND:
+  ✓ backend/ai/failure_diagnosis.py - AI diagnosis logic
+  ✓ backend/services/diagnosis_service.py - Diagnosis CRUD + stats
+  ✓ backend/websocket/manager.py - WebSocket connection manager
+  ✓ backend/websocket/events.py - WebSocket endpoints
+  ✓ backend/routers/ai.py - Updated with diagnosis endpoints
+  ✓ backend/scheduler/jobs.py - Integrated WebSocket broadcasts
+  ✓ backend/main.py - Added WebSocket router
+
+DATABASE:
+  ✓ failure_diagnoses table created with RLS policies
+
+================================================================================
+                          API ENDPOINTS ADDED
+================================================================================
+
+POST /ai/diagnose             - Request AI diagnosis for API failure
+GET  /ai/diagnoses/{api_id}   - Get diagnosis history for API
+GET  /ai/diagnoses            - List all diagnoses for user
+GET  /ai/diagnosis-stats      - Get diagnosis statistics
+POST /ai/categorize           - Categorize failure type only
+GET  /ws/stats                - WebSocket connection statistics
+
+WEBSOCKET ENDPOINTS:
+ws://host/ws/logs?token=...   - Logs and events stream
+ws://host/ws/events?token=... - Events-only stream
+
+================================================================================
+                          BUILD VERIFICATION
+================================================================================
+
+BUILD COMMAND: npm run build
+RESULT: SUCCESS
+OUTPUT:
+  - dist/index.html (1.12 kB)
+  - dist/assets/index-*.css (31.90 kB)
+  - dist/assets/index-*.js (1,076.03 kB)
+
+STATUS: Production-ready with real-time and AI diagnosis features

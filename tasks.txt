@@ -1,0 +1,81 @@
+APIMerge — Build Tasks
+
+COMPLETED:
+[x] Supabase database schema (13 tables, full RLS)
+[x] Frontend: Landing page (hero, features, pricing, CTA)
+[x] Frontend: Auth pages (login, signup, forgot password)
+[x] Frontend: Auth context with Supabase email/password
+[x] Frontend: Toast notification system
+[x] Frontend: Dashboard layout with sidebar
+[x] Frontend: Dashboard home (KPIs, charts, status overview, LIVE updates)
+[x] Frontend: APIs monitoring page (CRUD, ping, toggle, DIAGNOSIS)
+[x] Frontend: Logs page (paginated, filtered, searchable, REAL-TIME streaming)
+[x] Frontend: Analytics page (charts, heatmap, pie chart)
+[x] Frontend: API Merge / Workflows page
+[x] Frontend: AI Workflows & Format Generator page
+[x] Frontend: Keep-Alive Ticker page
+[x] Frontend: AI Tools (fallback tester) page
+[x] Frontend: Settings page (monitoring, AI, alerts)
+[x] Frontend: React Router with protected routes
+[x] Frontend: Centralized Axios client with token injection
+[x] Frontend: WebSocket real-time hooks and services
+[x] Frontend: LiveStatusIndicator component
+[x] Frontend: LiveLogFeed component
+[x] Frontend: DiagnosisPanel component
+[x] Backend: FastAPI main app with CORS
+[x] Backend: Supabase Python client (service role)
+[x] Backend: Auth middleware (JWT verification)
+[x] Backend: APIs router (CRUD + check endpoint)
+[x] Backend: AI router (fallback generation, format/workflow AI, DIAGNOSIS)
+[x] Backend: Merge router (execute merge, slug endpoint)
+[x] Backend: Ticker router (CRUD + ping)
+[x] Backend: Monitoring router (logs + stats)
+[x] Backend: Analytics router (overview, daily data)
+[x] Backend: Workflows router (CRUD)
+[x] Backend: APScheduler (API checks + ticker pings + WEBSOCKET broadcasts)
+[x] Backend: Groq AI client (LLaMA-3.1)
+[x] Backend: Gemini AI client (fallback)
+[x] Backend: AI Failure Diagnosis System (root cause analysis)
+[x] Backend: Diagnosis Service (create, retrieve, stats)
+[x] Backend: WebSocket Connection Manager
+[x] Backend: WebSocket Event Broadcasting
+[x] Backend: WebSocket Endpoints (/ws/logs, /ws/events)
+[x] Database: failure_diagnoses table with RLS
+[x] Env example files (frontend + backend)
+[x] schema.sql (full schema for reference)
+[x] tasks.txt (this file)
+[x] README.md
+
+NEW FEATURES ADDED:
+[x] AI FAILURE DIAGNOSIS SYSTEM
+    - Backend: ai/failure_diagnosis.py (Groq + Gemini cascade)
+    - Backend: services/diagnosis_service.py
+    - Backend: POST /ai/diagnose endpoint
+    - Frontend: DiagnosisPanel component with severity badges
+    - Frontend: Confidence meter, suggested fix cards
+    - Frontend: Diagnose button on failed APIs
+    - Database: failure_diagnoses table
+
+[x] REAL-TIME MONITORING PIPELINE
+    - Backend: websocket/manager.py (Connection Manager)
+    - Backend: websocket/events.py (WebSocket endpoints)
+    - Backend: Scheduler broadcasts all events live
+    - Frontend: useWebSocket hook with auto-reconnect
+    - Frontend: useRealtime hook (Supabase Realtime alternative)
+    - Frontend: useWebSocketRealtime hook
+    - Frontend: LiveStatusIndicator component
+    - Frontend: LiveLogFeed component
+    - Dashboard: Live updates banner
+    - Dashboard: Real-time API status with animations
+    - Dashboard: Real-time activity feed
+    - Logs Page: Live streaming mode
+    - APIs Page: Live status indicator, diagnosis modal
+
+IN PROGRESS / TODO:
+[ ] Email alerts via Resend (backend service)
+[ ] Discord webhook alert service
+[ ] Backend deployment to Render
+[ ] Frontend deployment to Vercel
+[ ] API rate limiting middleware
+[ ] API key management for users
+[ ] Team/organization support

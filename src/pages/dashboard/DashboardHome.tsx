@@ -2,14 +2,13 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Activity, Zap, Brain, TrendingUp, AlertTriangle, Clock,
-  CheckCircle, XCircle, ArrowRight, RefreshCw, Radio, AlertCircle
+  Activity, TrendingUp, AlertTriangle, Clock,
+  CheckCircle, XCircle, ArrowRight, RefreshCw
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar
 } from 'recharts';
 import StatCard from '../../components/ui/StatCard';
-import LiveStatusIndicator from '../../components/dashboard/LiveStatusIndicator';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Api, ApiLog } from '../../lib/types';
@@ -237,7 +236,7 @@ export default function DashboardHome() {
           </div>
           <div className="space-y-2">
             <AnimatePresence>
-              {(liveLogs.length > 0 ? liveLogs : recentLogs).slice(0, 8).map((log, i) => (
+              {recentLogs.slice(0, 8).map((log) => (
                 <motion.div
                   key={log.id}
                   initial={{ opacity: 0, x: -10 }}

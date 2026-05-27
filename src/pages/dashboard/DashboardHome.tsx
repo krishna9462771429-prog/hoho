@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Activity, TrendingUp, AlertTriangle, Clock,
-  CheckCircle, XCircle, ArrowRight, RefreshCw
+  CheckCircle, XCircle, ArrowRight, RefreshCw, Brain
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar
@@ -81,14 +81,6 @@ export default function DashboardHome() {
   const fallbacksToday = todayLogs.filter((l) => l.is_fallback).length;
   const avgLatency = recentLogs.length > 0 ? Math.round(recentLogs.reduce((s, l) => s + l.latency_ms, 0) / recentLogs.length) : 0;
 
-  const eventIcon = (type: string) => {
-    switch (type) {
-      case 'failure': return <AlertCircle className="w-3.5 h-3.5 text-red-400" />;
-      case 'recovery': return <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />;
-      case 'diagnosis': return <Brain className="w-3.5 h-3.5 text-amber-400" />;
-      default: return <Activity className="w-3.5 h-3.5 text-sky-400" />;
-    }
-  };
 
   if (loading) {
     return (

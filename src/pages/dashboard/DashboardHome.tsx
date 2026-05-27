@@ -27,7 +27,32 @@ export default function DashboardHome() {
 
 
   useEffect(() => {
-    if (user) fetchData();
+    if (!user) return;
+
+    fetchData();
+
+    const subscription = supabase
+      .channel('api_logs')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'api_logs' }, (payload) => {
+        (async () => {
+          const { data } = await supabase
+            .from('api_logs')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('checked_at', { ascending: false })
+            .limit(50);
+
+          if (data) {
+            setRecentLogs(data.slice(0, 10));
+            buildChartData(data);
+          }
+        })();
+      })
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [user]);
 
   const fetchData = async () => {

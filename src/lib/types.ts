@@ -19,6 +19,19 @@ export interface UserSettings {
   notification_email: string;
   created_at: string;
   updated_at: string;
+  use_personal_ai_keys?: boolean;
+  groq_api_key?: string;
+  gemini_api_key?: string;
+}
+
+export interface BYOKCredentials {
+  groq_key_masked: string | null;
+  gemini_key_masked: string | null;
+  groq_source: "user" | "platform";
+  gemini_source: "user" | "platform";
+  use_personal_ai_keys: boolean;
+  has_groq_key: boolean;
+  has_gemini_key: boolean;
 }
 
 export interface Api {

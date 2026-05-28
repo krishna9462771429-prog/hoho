@@ -38,7 +38,8 @@ export default function SettingsPage() {
   useEffect(() => { if (user) fetchSettings(); }, [user]);
 
   const fetchSettings = async () => {
-    const { data } = await supabase.from('user_settings').select('*').eq('user_id', user!.id).maybeSingle();
+    if (!user?.id) return;
+    const { data } = await supabase.from('user_settings').select('*').eq('user_id', user.id).maybeSingle();
     if (data) {
       setSettings(data);
       setUsePersonalKeys(data.use_personal_keys || false);
@@ -50,11 +51,12 @@ export default function SettingsPage() {
 
   const handleSave = async () => {
     setSaving(true);
-    const { data: existing } = await supabase.from('user_settings').select('id').eq('user_id', user!.id).maybeSingle();
-    const payload = { ...settings, user_id: user!.id, updated_at: new Date().toISOString() };
+    if (!user?.id) return;
+    const { data: existing } = await supabase.from('user_settings').select('id').eq('user_id', user.id).maybeSingle();
+    const payload = { ...settings, user_id: user.id, updated_at: new Date().toISOString() };
     let error;
     if (existing) {
-      ({ error } = await supabase.from('user_settings').update(payload).eq('user_id', user!.id));
+      ({ error } = await supabase.from('user_settings').update(payload).eq('user_id', user.id));
     } else {
       ({ error } = await supabase.from('user_settings').insert(payload));
     }
@@ -65,11 +67,12 @@ export default function SettingsPage() {
 
   const handleByokToggle = async (enabled: boolean) => {
     setByokSaving(true);
-    const payload = { ...settings, user_id: user!.id, use_personal_keys: enabled, updated_at: new Date().toISOString() };
-    const { data: existing } = await supabase.from('user_settings').select('id').eq('user_id', user!.id).maybeSingle();
+    if (!user?.id) return;
+    const payload = { ...settings, user_id: user.id, use_personal_keys: enabled, updated_at: new Date().toISOString() };
+    const { data: existing } = await supabase.from('user_settings').select('id').eq('user_id', user.id).maybeSingle();
     let error;
     if (existing) {
-      ({ error } = await supabase.from('user_settings').update(payload).eq('user_id', user!.id));
+      ({ error } = await supabase.from('user_settings').update(payload).eq('user_id', user.id));
     } else {
       ({ error } = await supabase.from('user_settings').insert(payload));
     }
@@ -83,19 +86,19 @@ export default function SettingsPage() {
   };
 
   const saveApiKey = async (provider: 'groq' | 'gemini', key: string) => {
-    if (!key.trim()) return;
+    if (!key.trim() || !user?.id) return;
     setByokSaving(true);
     const payload = {
       ...settings,
-      user_id: user!.id,
+      user_id: user.id,
       use_personal_keys: true,
       ...(provider === 'groq' ? { has_groq_key: true } : { has_gemini_key: true }),
       updated_at: new Date().toISOString(),
     };
-    const { data: existing } = await supabase.from('user_settings').select('id').eq('user_id', user!.id).maybeSingle();
+    const { data: existing } = await supabase.from('user_settings').select('id').eq('user_id', user.id).maybeSingle();
     let error;
     if (existing) {
-      ({ error } = await supabase.from('user_settings').update(payload).eq('user_id', user!.id));
+      ({ error } = await supabase.from('user_settings').update(payload).eq('user_id', user.id));
     } else {
       ({ error } = await supabase.from('user_settings').insert(payload));
     }
@@ -114,16 +117,17 @@ export default function SettingsPage() {
 
   const deleteApiKey = async (provider: 'groq' | 'gemini') => {
     setByokSaving(true);
+    if (!user?.id) return;
     const payload = {
       ...settings,
-      user_id: user!.id,
+      user_id: user.id,
       ...(provider === 'groq' ? { has_groq_key: false } : { has_gemini_key: false }),
       updated_at: new Date().toISOString(),
     };
-    const { data: existing } = await supabase.from('user_settings').select('id').eq('user_id', user!.id).maybeSingle();
+    const { data: existing } = await supabase.from('user_settings').select('id').eq('user_id', user.id).maybeSingle();
     let error;
     if (existing) {
-      ({ error } = await supabase.from('user_settings').update(payload).eq('user_id', user!.id));
+      ({ error } = await supabase.from('user_settings').update(payload).eq('user_id', user.id));
     } else {
       ({ error } = await supabase.from('user_settings').insert(payload));
     }

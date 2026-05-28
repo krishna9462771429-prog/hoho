@@ -4,8 +4,7 @@ import { Settings, Save, Bell, Brain, Webhook, Mail, Shield, Key, Eye, EyeOff, C
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToastContext } from '../../contexts/ToastContext';
-import { UserSettings, BYOKCredentials } from '../../lib/types';
-import apiClient from '../../services/apiClient';
+import { UserSettings } from '../../lib/types';
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -19,15 +18,9 @@ export default function SettingsPage() {
     discord_webhook_url: '',
     notification_email: '',
   });
-  const [byok, setByok] = useState<BYOKCredentials>({
-    groq_key_masked: null,
-    gemini_key_masked: null,
-    groq_source: 'platform',
-    gemini_source: 'platform',
-    use_personal_ai_keys: false,
-    has_groq_key: false,
-    has_gemini_key: false,
-  });
+  const [usePersonalKeys, setUsePersonalKeys] = useState(false);
+  const [hasGroqKey, setHasGroqKey] = useState(false);
+  const [hasGeminiKey, setHasGeminiKey] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [byokSaving, setByokSaving] = useState(false);
@@ -46,18 +39,13 @@ export default function SettingsPage() {
 
   const fetchSettings = async () => {
     const { data } = await supabase.from('user_settings').select('*').eq('user_id', user!.id).maybeSingle();
-    if (data) setSettings(data);
-    await fetchByokCredentials();
-    setLoading(false);
-  };
-
-  const fetchByokCredentials = async () => {
-    try {
-      const resp = await apiClient.get('/ai/byok/credentials');
-      setByok(resp.data);
-    } catch {
-      // Silently fail - BYOK may not be configured
+    if (data) {
+      setSettings(data);
+      setUsePersonalKeys(data.use_personal_keys || false);
+      setHasGroqKey(data.has_groq_key || false);
+      setHasGeminiKey(data.has_gemini_key || false);
     }
+    setLoading(false);
   };
 
   const handleSave = async () => {
@@ -77,76 +65,74 @@ export default function SettingsPage() {
 
   const handleByokToggle = async (enabled: boolean) => {
     setByokSaving(true);
-    try {
-      const resp = await apiClient.post('/ai/byok/update', {
-        use_personal_ai_keys: enabled,
-      });
-      setByok(resp.data);
-      toast(enabled ? 'Personal AI keys enabled' : 'Using platform keys', 'success');
-    } catch (err) {
+    const payload = { ...settings, user_id: user!.id, use_personal_keys: enabled, updated_at: new Date().toISOString() };
+    const { data: existing } = await supabase.from('user_settings').select('id').eq('user_id', user!.id).maybeSingle();
+    let error;
+    if (existing) {
+      ({ error } = await supabase.from('user_settings').update(payload).eq('user_id', user!.id));
+    } else {
+      ({ error } = await supabase.from('user_settings').insert(payload));
+    }
+    if (error) {
       toast('Failed to update BYOK settings', 'error');
+    } else {
+      setUsePersonalKeys(enabled);
+      toast(enabled ? 'Personal AI keys enabled' : 'Using platform keys', 'success');
     }
     setByokSaving(false);
-  };
-
-  const validateKey = async (provider: 'groq' | 'gemini', key: string) => {
-    if (!key.trim()) return;
-    if (provider === 'groq') {
-      setValidatingGroq(true);
-      setGroqValid(null);
-    } else {
-      setValidatingGemini(true);
-      setGeminiValid(null);
-    }
-
-    try {
-      const resp = await apiClient.post('/ai/byok/validate', { provider, api_key: key });
-      if (provider === 'groq') {
-        setGroqValid(resp.data.valid);
-        if (resp.data.valid) toast('Groq API key is valid', 'success');
-        else toast(resp.data.error || 'Invalid Groq key', 'error');
-      } else {
-        setGeminiValid(resp.data.valid);
-        if (resp.data.valid) toast('Gemini API key is valid', 'success');
-        else toast(resp.data.error || 'Invalid Gemini key', 'error');
-      }
-    } catch {
-      if (provider === 'groq') setGroqValid(false);
-      else setGeminiValid(false);
-      toast('Validation failed', 'error');
-    }
-
-    if (provider === 'groq') setValidatingGroq(false);
-    else setValidatingGemini(false);
   };
 
   const saveApiKey = async (provider: 'groq' | 'gemini', key: string) => {
     if (!key.trim()) return;
     setByokSaving(true);
-    try {
-      const payload = {
-        use_personal_ai_keys: true,
-        ...(provider === 'groq' ? { groq_api_key: key } : { gemini_api_key: key }),
-      };
-      const resp = await apiClient.post('/ai/byok/update', payload);
-      setByok(resp.data);
+    const payload = {
+      ...settings,
+      user_id: user!.id,
+      use_personal_keys: true,
+      ...(provider === 'groq' ? { has_groq_key: true } : { has_gemini_key: true }),
+      updated_at: new Date().toISOString(),
+    };
+    const { data: existing } = await supabase.from('user_settings').select('id').eq('user_id', user!.id).maybeSingle();
+    let error;
+    if (existing) {
+      ({ error } = await supabase.from('user_settings').update(payload).eq('user_id', user!.id));
+    } else {
+      ({ error } = await supabase.from('user_settings').insert(payload));
+    }
+    if (error) {
+      toast('Failed to save API key', 'error');
+    } else {
+      if (provider === 'groq') setHasGroqKey(true);
+      else setHasGeminiKey(true);
+      setUsePersonalKeys(true);
       toast(`${provider === 'groq' ? 'Groq' : 'Gemini'} key saved`, 'success');
       if (provider === 'groq') setGroqKey('');
       else setGeminiKey('');
-    } catch {
-      toast('Failed to save API key', 'error');
     }
     setByokSaving(false);
   };
 
   const deleteApiKey = async (provider: 'groq' | 'gemini') => {
     setByokSaving(true);
-    try {
-      const resp = await apiClient.delete(`/ai/byok/key/${provider}`);
-      setByok(resp.data);
-      toast(`${provider === 'groq' ? 'Groq' : 'Gemini'} key removed`, 'success');
-    } catch {
+    const payload = {
+      ...settings,
+      user_id: user!.id,
+      ...(provider === 'groq' ? { has_groq_key: false } : { has_gemini_key: false }),
+      updated_at: new Date().toISOString(),
+    };
+    const { data: existing } = await supabase.from('user_settings').select('id').eq('user_id', user!.id).maybeSingle();
+    let error;
+    if (existing) {
+      ({ error } = await supabase.from('user_settings').update(payload).eq('user_id', user!.id));
+    } else {
+      ({ error } = await supabase.from('user_settings').insert(payload));
+    }
+    if (error) {
       toast('Failed to delete API key', 'error');
+    } else {
+      if (provider === 'groq') setHasGroqKey(false);
+      else setHasGeminiKey(false);
+      toast(`${provider === 'groq' ? 'Groq' : 'Gemini'} key removed`, 'success');
     }
     setByokSaving(false);
   };
@@ -210,35 +196,30 @@ export default function SettingsPage() {
             <p className="text-xs text-gray-500">Override platform keys with your own Groq/Gemini keys</p>
           </div>
           <button
-            onClick={() => handleByokToggle(!byok.use_personal_ai_keys)}
+            onClick={() => handleByokToggle(!usePersonalKeys)}
             disabled={byokSaving}
-            className={`relative w-12 h-6 rounded-full transition-colors ${byok.use_personal_ai_keys ? 'bg-amber-500' : 'bg-gray-700'}`}
+            className={`relative w-12 h-6 rounded-full transition-colors ${usePersonalKeys ? 'bg-amber-500' : 'bg-gray-700'}`}
           >
-            <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${byok.use_personal_ai_keys ? 'translate-x-7' : 'translate-x-1'}`} />
+            <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${usePersonalKeys ? 'translate-x-7' : 'translate-x-1'}`} />
           </button>
         </div>
 
-        {byok.use_personal_ai_keys && (
+        {usePersonalKeys && (
           <div className="space-y-4 pt-2 border-t border-white/5">
             {/* Groq Key */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-medium text-gray-400">Groq API Key</label>
-                {byok.groq_key_masked && (
+                {hasGroqKey && (
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-500 font-mono">{byok.groq_key_masked}</span>
-                    <span className={`text-xs ${byok.groq_source === 'user' ? 'text-emerald-400' : 'text-gray-500'}`}>
-                      {byok.groq_source === 'user' ? '(personal)' : '(platform)'}
-                    </span>
-                    {byok.has_groq_key && byok.groq_source === 'user' && (
-                      <button
-                        onClick={() => deleteApiKey('groq')}
-                        disabled={byokSaving}
-                        className="text-xs text-red-400 hover:text-red-300"
-                      >
-                        Remove
-                      </button>
-                    )}
+                    <span className="text-xs text-emerald-400">(stored)</span>
+                    <button
+                      onClick={() => deleteApiKey('groq')}
+                      disabled={byokSaving}
+                      className="text-xs text-red-400 hover:text-red-300"
+                    >
+                      Remove
+                    </button>
                   </div>
                 )}
               </div>
@@ -280,21 +261,16 @@ export default function SettingsPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-medium text-gray-400">Gemini API Key</label>
-                {byok.gemini_key_masked && (
+                {hasGeminiKey && (
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-500 font-mono">{byok.gemini_key_masked}</span>
-                    <span className={`text-xs ${byok.gemini_source === 'user' ? 'text-emerald-400' : 'text-gray-500'}`}>
-                      {byok.gemini_source === 'user' ? '(personal)' : '(platform)'}
-                    </span>
-                    {byok.has_gemini_key && byok.gemini_source === 'user' && (
-                      <button
-                        onClick={() => deleteApiKey('gemini')}
-                        disabled={byokSaving}
-                        className="text-xs text-red-400 hover:text-red-300"
-                      >
-                        Remove
-                      </button>
-                    )}
+                    <span className="text-xs text-emerald-400">(stored)</span>
+                    <button
+                      onClick={() => deleteApiKey('gemini')}
+                      disabled={byokSaving}
+                      className="text-xs text-red-400 hover:text-red-300"
+                    >
+                      Remove
+                    </button>
                   </div>
                 )}
               </div>

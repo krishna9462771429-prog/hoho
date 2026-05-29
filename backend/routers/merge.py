@@ -129,44 +129,48 @@ async def _persist_execution(
 
 @router.post("/execute")
 async def execute_merge_endpoint(req: ExecuteMergeRequest):
-    sb = get_supabase()
-    apis_res = sb.table("apis").select("*").in_("id", req.api_ids).execute()
-    if not apis_res.data:
-        raise HTTPException(status_code=404, detail="No APIs found for the provided IDs")
+    try:
+        sb = get_supabase()
+        apis_res = sb.table("apis").select("*").in_("id", req.api_ids).execute()
+        if not apis_res.data:
+            raise HTTPException(status_code=404, detail="No APIs found for the provided IDs")
 
-    apis = apis_res.data
-    if len(apis) < 2:
-        raise HTTPException(status_code=422, detail="At least 2 valid APIs are required")
+        apis = apis_res.data
+        if len(apis) < 2:
+            raise HTTPException(status_code=422, detail="At least 2 valid APIs are required")
 
-    engine_req = MergeExecutionRequest(
-        api_ids=req.api_ids,
-        strategy=req.strategy,
-        user_id=req.user_id,
-        workflow_id=req.workflow_id,
-        conflict_resolution=req.conflict_resolution,
-        normalize=req.normalize,
-        timeout=req.timeout,
-        retry=req.retry,
-    )
+        engine_req = MergeExecutionRequest(
+            api_ids=req.api_ids,
+            strategy=req.strategy,
+            user_id=req.user_id,
+            workflow_id=req.workflow_id,
+            conflict_resolution=req.conflict_resolution,
+            normalize=req.normalize,
+            timeout=req.timeout,
+            retry=req.retry,
+        )
 
-    result = await execute_merge(engine_req, apis)
+        result = await execute_merge(engine_req, apis)
 
-    # Persist metrics without blocking the response
-    asyncio.create_task(
-        _persist_execution(req.user_id, req.workflow_id, result, req.api_ids)
-    )
+        # Persist metrics without blocking the response
+        asyncio.create_task(
+            _persist_execution(req.user_id, req.workflow_id, result, req.api_ids)
+        )
 
-    return {
-        "success": result.success,
-        "strategy": result.strategy,
-        "execution_time_ms": result.execution_time_ms,
-        "successful_apis": result.successful_apis,
-        "failed_apis": result.failed_apis,
-        "total_apis": result.total_apis,
-        "data": result.data,
-        "errors": result.errors,
-        "metadata": _build_metadata(result),
-    }
+        return {
+            "success": result.success,
+            "strategy": result.strategy,
+            "execution_time_ms": result.execution_time_ms,
+            "successful_apis": result.successful_apis,
+            "failed_apis": result.failed_apis,
+            "total_apis": result.total_apis,
+            "data": result.data,
+            "errors": result.errors,
+            "metadata": _build_metadata(result),
+        }
+    except Exception as e:
+        logger.exception("Merge execution failed")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/execute/authenticated")

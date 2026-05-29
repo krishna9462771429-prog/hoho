@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToastContext } from '../../contexts/ToastContext';
 import { UserSettings } from '../../lib/types';
+import apiClient from '../../services/apiClient';
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -67,76 +68,48 @@ export default function SettingsPage() {
 
   const handleByokToggle = async (enabled: boolean) => {
     setByokSaving(true);
-    if (!user?.id) return;
-    const payload = { ...settings, user_id: user.id, use_personal_keys: enabled, updated_at: new Date().toISOString() };
-    const { data: existing } = await supabase.from('user_settings').select('id').eq('user_id', user.id).maybeSingle();
-    let error;
-    if (existing) {
-      ({ error } = await supabase.from('user_settings').update(payload).eq('user_id', user.id));
-    } else {
-      ({ error } = await supabase.from('user_settings').insert(payload));
-    }
-    if (error) {
-      toast('Failed to update BYOK settings', 'error');
-    } else {
-      setUsePersonalKeys(enabled);
+    try {
+      const resp = await apiClient.post('/ai/byok/update', {
+        use_personal_ai_keys: enabled,
+      });
+      setUsePersonalKeys(resp.data.use_personal_ai_keys);
       toast(enabled ? 'Personal AI keys enabled' : 'Using platform keys', 'success');
+    } catch (err) {
+      toast('Failed to update BYOK settings', 'error');
     }
     setByokSaving(false);
   };
 
   const saveApiKey = async (provider: 'groq' | 'gemini', key: string) => {
-    if (!key.trim() || !user?.id) return;
+    if (!key.trim()) return;
     setByokSaving(true);
-    const payload = {
-      ...settings,
-      user_id: user.id,
-      use_personal_keys: true,
-      ...(provider === 'groq' ? { has_groq_key: true } : { has_gemini_key: true }),
-      updated_at: new Date().toISOString(),
-    };
-    const { data: existing } = await supabase.from('user_settings').select('id').eq('user_id', user.id).maybeSingle();
-    let error;
-    if (existing) {
-      ({ error } = await supabase.from('user_settings').update(payload).eq('user_id', user.id));
-    } else {
-      ({ error } = await supabase.from('user_settings').insert(payload));
-    }
-    if (error) {
-      toast('Failed to save API key', 'error');
-    } else {
-      if (provider === 'groq') setHasGroqKey(true);
-      else setHasGeminiKey(true);
-      setUsePersonalKeys(true);
+    try {
+      const payload = {
+        use_personal_ai_keys: true,
+        ...(provider === 'groq' ? { groq_api_key: key } : { gemini_api_key: key }),
+      };
+      const resp = await apiClient.post('/ai/byok/update', payload);
+      setUsePersonalKeys(resp.data.use_personal_ai_keys);
+      if (provider === 'groq') setHasGroqKey(resp.data.has_groq_key);
+      else setHasGeminiKey(resp.data.has_gemini_key);
       toast(`${provider === 'groq' ? 'Groq' : 'Gemini'} key saved`, 'success');
       if (provider === 'groq') setGroqKey('');
       else setGeminiKey('');
+    } catch {
+      toast('Failed to save API key', 'error');
     }
     setByokSaving(false);
   };
 
   const deleteApiKey = async (provider: 'groq' | 'gemini') => {
     setByokSaving(true);
-    if (!user?.id) return;
-    const payload = {
-      ...settings,
-      user_id: user.id,
-      ...(provider === 'groq' ? { has_groq_key: false } : { has_gemini_key: false }),
-      updated_at: new Date().toISOString(),
-    };
-    const { data: existing } = await supabase.from('user_settings').select('id').eq('user_id', user.id).maybeSingle();
-    let error;
-    if (existing) {
-      ({ error } = await supabase.from('user_settings').update(payload).eq('user_id', user.id));
-    } else {
-      ({ error } = await supabase.from('user_settings').insert(payload));
-    }
-    if (error) {
-      toast('Failed to delete API key', 'error');
-    } else {
+    try {
+      const resp = await apiClient.delete(`/ai/byok/key/${provider}`);
       if (provider === 'groq') setHasGroqKey(false);
       else setHasGeminiKey(false);
       toast(`${provider === 'groq' ? 'Groq' : 'Gemini'} key removed`, 'success');
+    } catch {
+      toast('Failed to delete API key', 'error');
     }
     setByokSaving(false);
   };
